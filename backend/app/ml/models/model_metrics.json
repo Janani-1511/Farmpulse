@@ -1,0 +1,17 @@
+{
+  "model_name": "RandomForestRegressor",
+  "trained_at": "2026-08-31 11:57:20",
+  "total_records": 53280,
+  "train_records": 42624,
+  "test_records": 10656,
+  "primary_model_metrics": {
+    "MAE": 157.38,
+    "RMSE": 232.63,
+    "R2_Score": 0.9935
+  },
+  "baseline_model_metrics": {
+    "MAE": 158.54,
+    "RMSE": 233.7,
+    "R2_Score": 0.9934
+  }
+}

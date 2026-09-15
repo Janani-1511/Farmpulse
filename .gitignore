@@ -1,0 +1,15 @@
+# Dependencies
+**/node_modules/
+
+# Expo
+**/.expo/
+
+# Environment variables
+.env
+.env.*
+
+# Build outputs
+**/dist/
+**/build/
+# ML model files
+backend/app/ml/models/*.pkl

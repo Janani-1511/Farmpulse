@@ -1,0 +1,101 @@
+from typing import List, Dict, Any, Optional
+
+MARKETS_DATABASE: List[Dict[str, Any]] = [
+    {
+        "id": "mkt_coimbatore",
+        "market_name": "Coimbatore Central Market",
+        "district": "Coimbatore",
+        "state": "Tamil Nadu",
+        "latitude": 11.0168,
+        "longitude": 76.9558,
+        "market_type": "Wholesale Regulated Market",
+        "supported_crops": ["Tomato", "Potato", "Onion", "Chilly", "Rice", "Wheat", "Maize"],
+        "price_modifier": 1.0,
+    },
+    {
+        "id": "mkt_pollachi",
+        "market_name": "Pollachi Agricultural Market",
+        "district": "Coimbatore",
+        "state": "Tamil Nadu",
+        "latitude": 10.6609,
+        "longitude": 77.0048,
+        "market_type": "Regulated Farmer Market (Uzhavar Sandhai)",
+        "supported_crops": ["Tomato", "Coconut", "Onion", "Chilly", "Maize", "Cotton"],
+        "price_modifier": 1.08,  # Higher demand market
+    },
+    {
+        "id": "mkt_mettupalayam",
+        "market_name": "Mettupalayam Produce Yard",
+        "district": "Coimbatore",
+        "state": "Tamil Nadu",
+        "latitude": 11.2996,
+        "longitude": 76.9400,
+        "market_type": "Vegetable & Spices Hub",
+        "supported_crops": ["Tomato", "Potato", "Chilly", "Onion"],
+        "price_modifier": 1.03,
+    },
+    {
+        "id": "mkt_tiruppur",
+        "market_name": "Tiruppur District Commodity Market",
+        "district": "Tiruppur",
+        "state": "Tamil Nadu",
+        "latitude": 11.1085,
+        "longitude": 77.3411,
+        "market_type": "Wholesale Market",
+        "supported_crops": ["Tomato", "Cotton", "Maize", "Rice", "Onion"],
+        "price_modifier": 0.98,
+    },
+    {
+        "id": "mkt_erode",
+        "market_name": "Erode Turmeric & Grain Market",
+        "district": "Erode",
+        "state": "Tamil Nadu",
+        "latitude": 11.3410,
+        "longitude": 77.7172,
+        "market_type": "Major Terminal Market",
+        "supported_crops": ["Tomato", "Turmeric", "Rice", "Maize", "Onion", "Chilly"],
+        "price_modifier": 1.05,
+    },
+    {
+        "id": "mkt_salem",
+        "market_name": "Salem APMC Market",
+        "district": "Salem",
+        "state": "Tamil Nadu",
+        "latitude": 11.6643,
+        "longitude": 78.1460,
+        "market_type": "Wholesale Agricultural Yard",
+        "supported_crops": ["Tomato", "Potato", "Onion", "Rice", "Wheat"],
+        "price_modifier": 0.96,
+    },
+    {
+        "id": "mkt_madurai",
+        "market_name": "Madurai Mattuthavani Market",
+        "district": "Madurai",
+        "state": "Tamil Nadu",
+        "latitude": 9.9252,
+        "longitude": 78.1198,
+        "market_type": "Integrated Farmers Market",
+        "supported_crops": ["Tomato", "Onion", "Chilly", "Rice", "Cotton"],
+        "price_modifier": 1.04,
+    },
+    {
+        "id": "mkt_dindigul",
+        "market_name": "Dindigul Vegetable Market",
+        "district": "Dindigul",
+        "state": "Tamil Nadu",
+        "latitude": 10.3673,
+        "longitude": 77.9803,
+        "market_type": "District Agricultural Market",
+        "supported_crops": ["Tomato", "Onion", "Potato", "Chilly"],
+        "price_modifier": 0.97,
+    }
+]
+
+def get_all_markets() -> List[Dict[str, Any]]:
+    return MARKETS_DATABASE
+
+def get_market_by_id(market_id: str) -> Optional[Dict[str, Any]]:
+    for market in MARKETS_DATABASE:
+        if market["id"] == market_id:
+            return market
+    return None
