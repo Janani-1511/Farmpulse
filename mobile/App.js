@@ -47,28 +47,15 @@ const LOGO = require('./assets/logo.jpg');
 export default function App() {
   const scrollViewRef = useRef(null);
 
-  // Authentication State
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const saved = window.localStorage.getItem('farmpulse_user');
-        return saved ? JSON.parse(saved) : null;
-      }
-    } catch (e) {
-      console.log('Session load error:', e);
-    }
-    return null;
-  });
+  // Authentication State (Always defaults to null so the app opens on the Sign-In screen)
+  const [currentUser, setCurrentUser] = useState(null);
 
   const handleLoginSuccess = (userData) => {
     setCurrentUser(userData);
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem('farmpulse_user', JSON.stringify(userData));
-      }
-    } catch (e) {
-      console.log('Session save error:', e);
-    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
   };
 
   // Inject global CSS rule to strip default web browser blue outline and apply theme neon green glow
@@ -105,18 +92,6 @@ export default function App() {
     }
   }, []);
 
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.removeItem('farmpulse_user');
-      }
-    } catch (e) {
-      console.log('Session clear error:', e);
-    }
-  };
-
   // Website Multi-Page Navigation State ('home' | 'trend' | 'history' | 'retail' | 'markets' | 'profile')
   const [activePage, setActivePage] = useState('home');
   const [trendParams, setTrendParams] = useState(null);
@@ -131,10 +106,18 @@ export default function App() {
     }
   };
 
+  const getTodayFormatted = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Form State
   const [crop, setCrop] = useState('Tomato');
   const [quantity, setQuantity] = useState(20);
-  const [targetDate, setTargetDate] = useState('2026-09-05');
+  const [targetDate, setTargetDate] = useState(getTodayFormatted);
   const [location, setLocation] = useState({
     name: 'Coimbatore, Tamil Nadu',
     latitude: 11.0168,
@@ -142,6 +125,9 @@ export default function App() {
     isGps: false,
   });
 
+
+  // Search Radius State (Default 100 km)
+  const [searchRadius, setSearchRadius] = useState(100.0);
 
   // Health & UI State
   const [healthStatus, setHealthStatus] = useState(null);
@@ -166,7 +152,7 @@ export default function App() {
     fetchHealth();
   }, []);
 
-  const handleRunAnalysis = async () => {
+  const handleRunAnalysis = async (customRadius = null) => {
     if (!crop) {
       Alert.alert('Selection Error', 'Please select a crop to proceed.');
       return;
@@ -180,6 +166,11 @@ export default function App() {
       return;
     }
 
+    const radiusToUse = typeof customRadius === 'number' ? customRadius : searchRadius;
+    if (typeof customRadius === 'number' && customRadius !== searchRadius) {
+      setSearchRadius(customRadius);
+    }
+
     setAnalyzing(true);
     setErrorMsg(null);
 
@@ -189,7 +180,7 @@ export default function App() {
       latitude: location.latitude,
       longitude: location.longitude,
       target_date: targetDate,
-      search_radius: 100.0,
+      search_radius: radiusToUse,
       location_name: location.name,
     };
 
@@ -305,7 +296,12 @@ export default function App() {
                   <DateSelector targetDate={targetDate} onChangeDate={setTargetDate} />
 
                   {/* 4. Full Street Address GPS / Manual Location Selector */}
-                  <LocationSelector currentLocation={location} onLocationChange={setLocation} />
+                  <LocationSelector
+                    currentLocation={location}
+                    onLocationChange={setLocation}
+                    searchRadius={searchRadius}
+                    onSearchRadiusChange={setSearchRadius}
+                  />
 
                   {/* Contextual Error Message with Retry */}
                   {errorMsg ? (
@@ -391,6 +387,8 @@ export default function App() {
                     <RecommendationCard
                       bestMarket={analysisResult.best_market}
                       recommendation={analysisResult.recommendation}
+                      currentRadius={searchRadius}
+                      onExpandRadius={(newRadius) => handleRunAnalysis(newRadius)}
                     />
                   </InteractiveCard>
 

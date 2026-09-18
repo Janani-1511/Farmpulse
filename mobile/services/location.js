@@ -93,42 +93,59 @@ const formatExpoGeocode = (place) => {
 /**
  * Formats OpenStreetMap Nominatim reverse geocode JSON into a full detailed street address.
  */
+/**
+ * Formats OpenStreetMap Nominatim reverse geocode JSON into a full detailed street address.
+ */
 const formatNominatimGeocode = (data) => {
-  if (!data || !data.address) return null;
-  const addr = data.address;
-  const parts = [];
+  if (!data || data.error) return null;
 
-  if (addr.house_number || addr.building) {
-    parts.push(`No. ${addr.house_number || addr.building}`);
+  if (data.address) {
+    const addr = data.address;
+    const parts = [];
+
+    if (addr.house_number || addr.building) {
+      parts.push(`No. ${addr.house_number || addr.building}`);
+    }
+
+    if (addr.road || addr.pedestrian || addr.street) {
+      parts.push(addr.road || addr.pedestrian || addr.street);
+    }
+
+    if (addr.suburb || addr.neighbourhood || addr.quarter) {
+      parts.push(addr.suburb || addr.neighbourhood || addr.quarter);
+    }
+
+    if (addr.city || addr.town || addr.village) {
+      parts.push(addr.city || addr.town || addr.village);
+    }
+
+    if (addr.county || addr.state_district) {
+      const distName = (addr.county || addr.state_district).replace(/ District$/i, '');
+      parts.push(`${distName} District`);
+    }
+
+    if (addr.state) {
+      parts.push(addr.state);
+    }
+
+    let result = parts.join(', ');
+    if (addr.postcode) {
+      result += ` - ${addr.postcode}`;
+    }
+
+    if (parts.length >= 1) return result;
+
+    if (addr.natural || addr.water || addr.ocean || addr.sea || addr.bay) {
+      const waterFeature = addr.natural || addr.water || addr.ocean || addr.sea || addr.bay;
+      return addr.state ? `${waterFeature}, ${addr.state}` : waterFeature;
+    }
   }
 
-  if (addr.road || addr.pedestrian || addr.street) {
-    parts.push(addr.road || addr.pedestrian || addr.street);
+  if (data.display_name && !data.display_name.toLowerCase().includes('unable to geocode')) {
+    return data.display_name;
   }
 
-  if (addr.suburb || addr.neighbourhood || addr.quarter) {
-    parts.push(addr.suburb || addr.neighbourhood || addr.quarter);
-  }
-
-  if (addr.city || addr.town || addr.village) {
-    parts.push(addr.city || addr.town || addr.village);
-  }
-
-  if (addr.county || addr.state_district) {
-    const distName = (addr.county || addr.state_district).replace(/ District$/i, '');
-    parts.push(`${distName} District`);
-  }
-
-  if (addr.state) {
-    parts.push(addr.state);
-  }
-
-  let result = parts.join(', ');
-  if (addr.postcode) {
-    result += ` - ${addr.postcode}`;
-  }
-
-  return parts.length >= 2 ? result : null;
+  return null;
 };
 
 /**
@@ -196,9 +213,11 @@ export const getGPSLocation = async () => {
       }
     }
 
-    // 3. Fallback to detailed street address for nearest coordinates
+    // 3. Fallback for coordinates if reverse geocoding returns no location name
     if (!locationName) {
-      locationName = getNearestDetailedAddress(latitude, longitude);
+      const latFormatted = `${Math.abs(latitude).toFixed(4)}° ${latitude >= 0 ? 'N' : 'S'}`;
+      const lonFormatted = `${Math.abs(longitude).toFixed(4)}° ${longitude >= 0 ? 'E' : 'W'}`;
+      locationName = `GPS Location (${latFormatted}, ${lonFormatted})`;
     }
 
     return {
@@ -289,16 +308,18 @@ export const reverseGeocodeCoords = async (lat, lon, signal = null) => {
 
     if (response.ok) {
       const data = await response.json();
-      const formatted = formatNominatimGeocode(data) || data.display_name;
+      if (data && !data.error) {
+        const formatted = formatNominatimGeocode(data);
 
-      if (formatted) {
-        // Maintain LRU Cache size
-        if (GEOCODE_CACHE.size >= MAX_CACHE_SIZE) {
-          const firstKey = GEOCODE_CACHE.keys().next().value;
-          GEOCODE_CACHE.delete(firstKey);
+        if (formatted) {
+          // Maintain LRU Cache size
+          if (GEOCODE_CACHE.size >= MAX_CACHE_SIZE) {
+            const firstKey = GEOCODE_CACHE.keys().next().value;
+            GEOCODE_CACHE.delete(firstKey);
+          }
+          GEOCODE_CACHE.set(cacheKey, formatted);
+          return formatted;
         }
-        GEOCODE_CACHE.set(cacheKey, formatted);
-        return formatted;
       }
     }
   } catch (err) {
@@ -307,7 +328,11 @@ export const reverseGeocodeCoords = async (lat, lon, signal = null) => {
     }
   }
 
-  const fallback = getNearestDetailedAddress(lat, lon);
+  // Fallback for pinned ocean / unmapped coordinates
+  const latFormatted = `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? 'N' : 'S'}`;
+  const lonFormatted = `${Math.abs(lon).toFixed(4)}° ${lon >= 0 ? 'E' : 'W'}`;
+  const fallback = `Offshore / Pinned Location (${latFormatted}, ${lonFormatted})`;
+
   GEOCODE_CACHE.set(cacheKey, fallback);
   return fallback;
 };

@@ -1,186 +1,103 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+const getBaseUrl = () => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname) {
+    return `http://${window.location.hostname}:8000/api`;
+  }
+  return 'http://127.0.0.1:8000/api';
+};
+
+const API_BASE_URL = getBaseUrl();
 const LOCALHOST_BASE_URL = 'http://localhost:8000/api';
 const EMULATOR_BASE_URL = 'http://10.0.2.2:8000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 12000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-export const checkHealth = async () => {
+const executeWithFallback = async (requestFn, fallbackMessage = 'Server request failed.') => {
   try {
-    const response = await api.get('/health');
-    return { success: true, data: response.data };
-  } catch (error) {
-    try {
-      const fallbackResponse = await axios.get(`${EMULATOR_BASE_URL}/health`, { timeout: 5000 });
-      return { success: true, data: fallbackResponse.data };
-    } catch (fallbackError) {
-      return {
-        success: false,
-        error: error.message || 'Unable to connect to FarmPulse API server.',
-      };
+    const res = await requestFn(API_BASE_URL, 15000);
+    return { success: true, data: res.data };
+  } catch (primaryErr) {
+    if (primaryErr.response?.data?.detail) {
+      return { success: false, error: primaryErr.response.data.detail };
     }
-  }
-};
-
-export const analyzeLocation = async (payload) => {
-  try {
-    const response = await api.post('/analyze-location', payload);
-    return { success: true, data: response.data };
-  } catch (error) {
-    try {
-      const fb1 = await axios.post(`${LOCALHOST_BASE_URL}/analyze-location`, payload, { timeout: 10000 });
-      return { success: true, data: fb1.data };
-    } catch (fb1Err) {
+    
+    if (API_BASE_URL !== LOCALHOST_BASE_URL) {
       try {
-        const fb2 = await axios.post(`${EMULATOR_BASE_URL}/analyze-location`, payload, { timeout: 10000 });
-        return { success: true, data: fb2.data };
-      } catch (fb2Err) {
-        return {
-          success: false,
-          error: error.response?.data?.detail || error.message || 'Failed to calculate market analysis. Please try again.',
-        };
+        const resFb1 = await requestFn(LOCALHOST_BASE_URL, 4000);
+        return { success: true, data: resFb1.data };
+      } catch (fb1Err) {
+        if (fb1Err.response?.data?.detail) {
+          return { success: false, error: fb1Err.response.data.detail };
+        }
       }
     }
+
+    if (Platform.OS !== 'web') {
+      try {
+        const resFb2 = await requestFn(EMULATOR_BASE_URL, 3000);
+        return { success: true, data: resFb2.data };
+      } catch (fb2Err) {
+        if (fb2Err.response?.data?.detail) {
+          return { success: false, error: fb2Err.response.data.detail };
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: primaryErr.response?.data?.detail || primaryErr.message || fallbackMessage,
+    };
   }
 };
 
-export const getPriceHistory = async (crop = 'Tomato', marketId = 'all', days = 30) => {
-  try {
-    const response = await api.get('/history', {
-      params: { crop, market_id: marketId, days, limit: 100 },
-    });
-    return { success: true, data: response.data };
-  } catch (error) {
-    try {
-      const fallbackResponse = await axios.get(`${EMULATOR_BASE_URL}/history`, {
-        params: { crop, market_id: marketId, days, limit: 100 },
-      });
-      return { success: true, data: fallbackResponse.data };
-    } catch (fallbackError) {
-      return {
-        success: false,
-        error: error.message || 'Failed to load historical price data.',
-      };
-    }
-  }
-};
+export const checkHealth = () =>
+  executeWithFallback((baseUrl, timeout) => axios.get(`${baseUrl}/health`, { timeout }), 'Unable to connect to FarmPulse API server.');
 
-export const getRetailPrices = async (crop = 'Tomato', district = 'Coimbatore') => {
-  try {
-    const response = await api.get('/retail-prices', {
-      params: { crop, district },
-    });
-    return { success: true, data: response.data };
-  } catch (error) {
-    try {
-      const fallbackResponse = await axios.get(`${EMULATOR_BASE_URL}/retail-prices`, {
-        params: { crop, district },
-      });
-      return { success: true, data: fallbackResponse.data };
-    } catch (fallbackError) {
-      return {
-        success: false,
-        error: error.message || 'Failed to load grocery retail shop prices.',
-      };
-    }
-  }
-};
+export const analyzeLocation = (payload) =>
+  executeWithFallback((baseUrl, timeout) => axios.post(`${baseUrl}/analyze-location`, payload, { timeout }), 'Failed to calculate market analysis. Please try again.');
 
-export const registerUser = async (payload) => {
-  try {
-    const response = await api.post('/auth/register', payload);
-    return { success: true, data: response.data };
-  } catch (error) {
-    try {
-      const fallbackResponse = await axios.post(`${EMULATOR_BASE_URL}/auth/register`, payload, { timeout: 10000 });
-      return { success: true, data: fallbackResponse.data };
-    } catch (fallbackError) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || error.message || 'Registration failed. Please check your information.',
-      };
-    }
-  }
-};
+export const getPriceHistory = (crop = 'Tomato', marketId = 'all', days = 30) =>
+  executeWithFallback((baseUrl, timeout) => axios.get(`${baseUrl}/history`, { params: { crop, market_id: marketId, days, limit: 100 }, timeout }), 'Failed to load historical price data.');
 
-export const loginUser = async (payload) => {
-  try {
-    const response = await api.post('/auth/login', payload);
-    return { success: true, data: response.data };
-  } catch (error) {
-    try {
-      const fallbackResponse = await axios.post(`${EMULATOR_BASE_URL}/auth/login`, payload, { timeout: 10000 });
-      return { success: true, data: fallbackResponse.data };
-    } catch (fallbackError) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || error.message || 'Invalid email or password. Please try again.',
-      };
-    }
-  }
-};
+export const getRetailPrices = (crop = 'Tomato', district = 'Coimbatore') =>
+  executeWithFallback((baseUrl, timeout) => axios.get(`${baseUrl}/retail-prices`, { params: { crop, district }, timeout }), 'Failed to load grocery retail shop prices.');
 
-export const loginWithGoogle = async (idToken) => {
-  try {
-    const response = await api.post('/auth/google', { id_token: idToken });
-    return { success: true, data: response.data };
-  } catch (error) {
-    try {
-      const fallbackResponse = await axios.post(`${EMULATOR_BASE_URL}/auth/google`, { id_token: idToken }, { timeout: 10000 });
-      return { success: true, data: fallbackResponse.data };
-    } catch (fallbackError) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || error.message || 'Unable to sign in with Google. Please try again.',
-      };
-    }
-  }
-};
+export const sendRegisterOtp = (email) =>
+  executeWithFallback((baseUrl, timeout) => axios.post(`${baseUrl}/auth/register-send-otp`, { email }, { timeout }), 'Failed to send registration verification code.');
 
-export const updateUserCity = async (userId, city) => {
-  try {
-    const response = await api.post('/auth/update-city', { user_id: userId, city });
-    return { success: true, data: response.data };
-  } catch (error) {
-    try {
-      const fallbackResponse = await axios.post(`${EMULATOR_BASE_URL}/auth/update-city`, { user_id: userId, city }, { timeout: 10000 });
-      return { success: true, data: fallbackResponse.data };
-    } catch (fallbackError) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || error.message || 'Failed to update city. Please try again.',
-      };
-    }
-  }
-};
+export const verifyRegisterOtp = (payload) =>
+  executeWithFallback((baseUrl, timeout) => axios.post(`${baseUrl}/auth/register-verify-otp`, payload, { timeout }), 'Verification failed. Invalid or expired OTP code.');
 
-export const getPriceTrend = async (crop = 'Tomato', marketId = 'mkt_coimbatore', historicalDays = 30, futureDays = 15) => {
-  try {
-    const response = await api.get('/price-trend', {
-      params: { crop, market_id: marketId, historical_days: historicalDays, future_days: futureDays },
-    });
-    return { success: true, data: response.data };
-  } catch (error) {
-    try {
-      const fallbackResponse = await axios.get(`${EMULATOR_BASE_URL}/price-trend`, {
-        params: { crop, market_id: marketId, historical_days: historicalDays, future_days: futureDays },
-      });
-      return { success: true, data: fallbackResponse.data };
-    } catch (fallbackError) {
-      return {
-        success: false,
-        error: error.response?.data?.detail || error.message || 'Failed to load price trend analysis.',
-      };
-    }
-  }
-};
+export const registerUser = (payload) =>
+  executeWithFallback((baseUrl, timeout) => axios.post(`${baseUrl}/auth/register`, payload, { timeout }), 'Registration failed. Please check your information.');
+
+export const loginUser = (payload) =>
+  executeWithFallback((baseUrl, timeout) => axios.post(`${baseUrl}/auth/login`, payload, { timeout }), 'Invalid email or password. Please try again.');
+
+export const loginWithGoogle = (idToken) =>
+  executeWithFallback((baseUrl, timeout) => axios.post(`${baseUrl}/auth/google`, { id_token: idToken }, { timeout }), 'Unable to sign in with Google. Please try again.');
+
+export const updateUserCity = (userId, city) =>
+  executeWithFallback((baseUrl, timeout) => axios.post(`${baseUrl}/auth/update-city`, { user_id: userId, city }, { timeout }), 'Failed to update city. Please try again.');
+
+export const sendOtp = (email) =>
+  executeWithFallback((baseUrl, timeout) => axios.post(`${baseUrl}/auth/send-otp`, { email }, { timeout }), 'Failed to send OTP code. Please try again.');
+
+export const verifyOtp = (email, otp) =>
+  executeWithFallback((baseUrl, timeout) => axios.post(`${baseUrl}/auth/verify-otp`, { email, otp }, { timeout }), 'Invalid or expired OTP code. Please try again.');
+
+export const resetPassword = (payload) =>
+  executeWithFallback((baseUrl, timeout) => axios.post(`${baseUrl}/auth/reset-password`, payload, { timeout }), 'Failed to reset password. Please try again.');
+
+export const getPriceTrend = (crop = 'Tomato', marketId = 'mkt_coimbatore', historicalDays = 30, futureDays = 15) =>
+  executeWithFallback((baseUrl, timeout) => axios.get(`${baseUrl}/price-trend`, { params: { crop, market_id: marketId, historical_days: historicalDays, future_days: futureDays }, timeout }), 'Failed to load price trend analysis.');
 
 export default api;
-

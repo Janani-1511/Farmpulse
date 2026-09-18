@@ -37,7 +37,9 @@ export default function MarketDetailModal({ visible, market, crop, quantity, onC
             {/* Distance & Predicted Price Highlights */}
             <View style={styles.badgeRow}>
               <View style={styles.badgeBox}>
-                <Text style={styles.badgeLabel}>Est. Distance (Haversine)</Text>
+                <Text style={styles.badgeLabel}>
+                  {market.distance_type === 'estimated' ? 'Est. Distance (Haversine)' : 'Road Distance (OSRM)'}
+                </Text>
                 <Text style={styles.badgeVal}>{market.distance_km} km</Text>
               </View>
               <View style={styles.badgeBox}>
@@ -84,7 +86,9 @@ export default function MarketDetailModal({ visible, market, crop, quantity, onC
                 <Text style={styles.rowValGross}>₹{market.expected_revenue?.toLocaleString('en-IN')}</Text>
               </View>
               <View style={styles.row}>
-                <Text style={styles.rowLabel}>Estimated Transport Cost (Haversine):</Text>
+                <Text style={styles.rowLabel}>
+                  {market.distance_type === 'estimated' ? 'Estimated Transport Cost (Haversine):' : 'Transport Cost (Road Route):'}
+                </Text>
                 <Text style={styles.rowValCost}>- ₹{market.transport_cost?.toLocaleString('en-IN')}</Text>
               </View>
 
@@ -97,7 +101,7 @@ export default function MarketDetailModal({ visible, market, crop, quantity, onC
             </View>
 
             <Text style={styles.disclaimerText}>
-              Transport cost calculated at ₹25/km using Haversine straight-line distance estimation. Gross revenue = ML predicted price × quantity.
+              Transport cost calculated at ₹25/km using {market.distance_method || (market.distance_type === 'estimated' ? 'Haversine straight-line estimation' : 'OSRM road driving distance routing')}. Gross revenue = ML predicted price × quantity.
             </Text>
           </ScrollView>
 

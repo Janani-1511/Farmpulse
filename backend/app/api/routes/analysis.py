@@ -22,6 +22,22 @@ def analyze_location(payload: AnalysisRequest):
             detail="Quantity must be greater than zero."
         )
 
+    # Validate target_date is not in the past
+    try:
+        from datetime import datetime, date
+        target_dt = datetime.strptime(payload.target_date, "%Y-%m-%d").date()
+        today = date.today()
+        if target_dt < today:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Target selling date ({payload.target_date}) cannot be in the past. Please select today or a future date."
+            )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid target_date format. Expected YYYY-MM-DD."
+        )
+
     search_radius = payload.search_radius if payload.search_radius and payload.search_radius > 0 else 100.0
 
     relevant_markets, nearby_markets = get_nearby_markets_analysis(

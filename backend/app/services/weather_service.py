@@ -24,11 +24,17 @@ WMO_WEATHER_CODES = {
     95: "Thunderstorm"
 }
 
+WEATHER_CACHE: Dict[str, Dict[str, Any]] = {}
+
 def get_market_weather_forecast(latitude: float, longitude: float, target_date_str: str) -> Dict[str, Any]:
     """
     Retrieves real weather forecast from Open-Meteo REST API for given lat/lon and target date.
     Open-Meteo provides up to 16 forecast days (days_ahead 0 to 15).
     """
+    cache_key = f"{round(latitude, 2)},{round(longitude, 2)},{target_date_str}"
+    if cache_key in WEATHER_CACHE:
+        return WEATHER_CACHE[cache_key]
+
     try:
         target_dt = datetime.strptime(target_date_str, "%Y-%m-%d").date()
     except Exception:
@@ -59,7 +65,7 @@ def get_market_weather_forecast(latitude: float, longitude: float, target_date_s
             f"daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,weathercode&"
             f"timezone=auto&forecast_days=16"
         )
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=2)
 
         if response.status_code == 200:
             data = response.json()
@@ -100,7 +106,7 @@ def get_market_weather_forecast(latitude: float, longitude: float, target_date_s
                     temp_max_c=t_max
                 )
 
-                return {
+                res = {
                     "available": True,
                     "date": target_date_str,
                     "days_ahead": days_ahead,
@@ -114,6 +120,8 @@ def get_market_weather_forecast(latitude: float, longitude: float, target_date_s
                     "weather_risk": impact_data["weather_risk"],
                     "impact_assessment": impact_data["impact_assessment"]
                 }
+                WEATHER_CACHE[cache_key] = res
+                return res
     except Exception as e:
         print(f"Weather API fetch warning: {e}")
 

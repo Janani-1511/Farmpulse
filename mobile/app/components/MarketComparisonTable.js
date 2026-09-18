@@ -100,7 +100,14 @@ export default function MarketComparisonTable({ markets, bestMarketId, onSelectM
                   <Text style={styles.districtSub}>{item.district}</Text>
                 </View>
 
-                <Text style={[styles.td, styles.colDist]}>{item.distance_km} km</Text>
+                <View style={[styles.td, styles.colDist, { alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={styles.distValueText}>{item.distance_km} km</Text>
+                  <View style={[styles.distBadge, item.distance_type === 'estimated' ? styles.distBadgeEst : styles.distBadgeRoad]}>
+                    <Text style={[styles.distBadgeText, item.distance_type === 'estimated' ? styles.distBadgeTextEst : styles.distBadgeTextRoad]}>
+                      {item.distance_type === 'estimated' ? 'Est.' : 'Road'}
+                    </Text>
+                  </View>
+                </View>
 
                 <View style={[styles.td, styles.colWeather]}>
                   {wAvailable ? (
@@ -241,7 +248,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   colMarket: { width: 160 },
-  colDist: { width: 85, textAlign: 'center' },
+  colDist: { width: 95, textAlign: 'center' },
+  distValueText: {
+    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  distBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginTop: 2,
+  },
+  distBadgeRoad: {
+    backgroundColor: '#DCFCE7',
+  },
+  distBadgeEst: {
+    backgroundColor: '#FEF3C7',
+  },
+  distBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  distBadgeTextRoad: {
+    color: '#15803D',
+  },
+  distBadgeTextEst: {
+    color: '#B45309',
+  },
   colWeather: { width: 125, justifyContent: 'center', alignItems: 'center' },
   colPrice: { width: 110, textAlign: 'right' },
   colCost: { width: 105, textAlign: 'right' },

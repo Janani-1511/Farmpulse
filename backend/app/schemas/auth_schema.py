@@ -34,3 +34,24 @@ class GoogleAuthRequest(BaseModel):
 class CityUpdateRequest(BaseModel):
     user_id: int
     city: str = Field(..., min_length=2, description="User's city name")
+
+class SendOtpRequest(BaseModel):
+    email: str = Field(..., description="Email address")
+
+class VerifyOtpRequest(BaseModel):
+    email: str = Field(..., description="Email address")
+    otp: str = Field(..., min_length=6, max_length=6, description="6-digit OTP code")
+
+class PasswordResetRequest(BaseModel):
+    email: str = Field(..., description="Email address")
+    new_password: str = Field(..., min_length=8, description="New password")
+
+class RegisterVerifyRequest(BaseModel):
+    full_name: str = Field(..., min_length=2, description="Full Name of the user")
+    email: str = Field(..., description="Email address")
+    city: str = Field(..., min_length=2, description="User's city name")
+    password: str = Field(..., min_length=8, description="Password")
+    otp: str = Field(..., min_length=6, max_length=6, description="6-digit OTP code")
+
+
+

@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     DEFAULT_MARKET_RADIUS_KM: float = 100.0
     TRANSPORT_RATE_PER_KM: float = 25.0
     GOOGLE_CLIENT_ID: str = ""
+    ROUTING_PROVIDER: str = "osrm"
+    ROUTING_API_KEY: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

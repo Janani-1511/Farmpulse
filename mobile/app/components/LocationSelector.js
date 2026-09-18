@@ -9,7 +9,21 @@ import {
 import { getGPSLocation } from '../../services/location';
 import InteractiveMapModal from './InteractiveMapModal';
 
-export default function LocationSelector({ currentLocation, onLocationChange }) {
+const RADIUS_OPTIONS = [
+  { label: '50 km', value: 50 },
+  { label: '100 km (Default)', value: 100 },
+  { label: '150 km', value: 150 },
+  { label: '250 km', value: 250 },
+  { label: '500 km', value: 500 },
+  { label: '1000 km', value: 1000 },
+];
+
+export default function LocationSelector({
+  currentLocation,
+  onLocationChange,
+  searchRadius = 100,
+  onSearchRadiusChange,
+}) {
   const [loading, setLoading] = useState(false);
   const [permissionError, setPermissionError] = useState(null);
   const [mapModalVisible, setMapModalVisible] = useState(false);
@@ -114,6 +128,33 @@ export default function LocationSelector({ currentLocation, onLocationChange }) 
             <TouchableOpacity style={styles.refreshBtn} onPress={handleFetchGPS}>
               <Text style={styles.refreshBtnText}>🔄 Re-detect GPS</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Target Market Search Radius Picker */}
+      {onSearchRadiusChange ? (
+        <View style={styles.radiusSection}>
+          <View style={styles.radiusHeaderRow}>
+            <Text style={styles.radiusLabel}>TARGET MARKET SEARCH RADIUS</Text>
+            <Text style={styles.radiusValueTag}>{searchRadius} KM</Text>
+          </View>
+
+          <View style={styles.radiusPillsRow}>
+            {RADIUS_OPTIONS.map((opt) => {
+              const isSelected = searchRadius === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.radiusPill, isSelected && styles.radiusPillActive]}
+                  onPress={() => onSearchRadiusChange(opt.value)}
+                >
+                  <Text style={[styles.radiusPillText, isSelected && styles.radiusPillTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       ) : null}
@@ -273,5 +314,59 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  radiusSection: {
+    backgroundColor: '#F8FAFC',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 4,
+  },
+  radiusHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  radiusLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#15803D',
+    letterSpacing: 0.5,
+  },
+  radiusValueTag: {
+    backgroundColor: '#DCFCE7',
+    color: '#15803D',
+    fontSize: 11,
+    fontWeight: '800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  radiusPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  radiusPill: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  radiusPillActive: {
+    backgroundColor: '#16A34A',
+    borderColor: '#15803D',
+  },
+  radiusPillText: {
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  radiusPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
 });
-

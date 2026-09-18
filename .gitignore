@@ -13,3 +13,9 @@
 **/build/
 # ML model files
 backend/app/ml/models/*.pkl
+
+# Python cache
+**/__pycache__/
+*.pyc
+# Local SQLite database
+backend/*.db

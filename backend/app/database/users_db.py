@@ -13,7 +13,7 @@ def get_db_connection():
     return conn
 
 def init_users_db():
-    """Initializes the users database table if it does not exist."""
+    """Initializes the users database table and OTP table if they do not exist."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -27,6 +27,14 @@ def init_users_db():
             created_at TEXT NOT NULL
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_otps (
+            email TEXT PRIMARY KEY,
+            otp TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            verified INTEGER DEFAULT 0
+        )
+    """)
     # Safely add Google Auth columns to existing table
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'password'")
@@ -36,6 +44,99 @@ def init_users_db():
         pass # Columns already exist
     conn.commit()
     conn.close()
+
+def generate_and_store_otp(email: str) -> str:
+    """Generates a 6-digit OTP and stores it for whatever email address is typed by the user."""
+    import random
+    from datetime import timedelta
+    
+    init_users_db()
+    clean_email = email.strip().lower()
+
+    otp = f"{random.randint(100000, 999999)}"
+    expires_at = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO password_reset_otps (email, otp, expires_at, verified)
+        VALUES (?, ?, ?, 0)
+        ON CONFLICT(email) DO UPDATE SET
+            otp = excluded.otp,
+            expires_at = excluded.expires_at,
+            verified = 0
+    """, (clean_email, otp, expires_at))
+    conn.commit()
+    conn.close()
+
+    return otp
+
+def verify_otp_code(email: str, otp: str) -> bool:
+    """Verifies if the submitted OTP matches and is not expired."""
+    init_users_db()
+    clean_email = email.strip().lower()
+    clean_otp = otp.strip()
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM password_reset_otps WHERE LOWER(email) = ?", (clean_email,))
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        raise ValueError("No OTP request found for this email address. Please request a new OTP.")
+
+    row_dict = dict(row)
+    expires_at = datetime.fromisoformat(row_dict["expires_at"])
+
+    if datetime.utcnow() > expires_at:
+        conn.close()
+        raise ValueError("The OTP code has expired. Please request a new code.")
+
+    if row_dict["otp"] != clean_otp:
+        conn.close()
+        raise ValueError("Invalid OTP code. Please check and try again.")
+
+    cursor.execute("UPDATE password_reset_otps SET verified = 1 WHERE LOWER(email) = ?", (clean_email,))
+    conn.commit()
+    conn.close()
+    return True
+
+def reset_password(email: str, new_password: str) -> bool:
+    """Resets or sets user password by email address after OTP verification."""
+    init_users_db()
+    clean_email = email.strip().lower()
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT verified FROM password_reset_otps WHERE LOWER(email) = ?", (clean_email,))
+    row = cursor.fetchone()
+    if not row or dict(row).get("verified") != 1:
+        conn.close()
+        raise ValueError("Email verification required. Please request and verify OTP first.")
+
+    user = get_user_by_email(clean_email)
+    pwd_hash, salt = hash_password(new_password)
+
+    if user:
+        cursor.execute("""
+            UPDATE users
+            SET password_hash = ?, salt = ?
+            WHERE id = ?
+        """, (pwd_hash, salt, user["id"]))
+    else:
+        created_at = datetime.utcnow().isoformat()
+        name_from_email = clean_email.split('@')[0].capitalize()
+        cursor.execute("""
+            INSERT INTO users (full_name, email, city, password_hash, salt, created_at, auth_provider)
+            VALUES (?, ?, 'Coimbatore', ?, ?, ?, 'password')
+        """, (name_from_email, clean_email, pwd_hash, salt, created_at))
+
+    cursor.execute("DELETE FROM password_reset_otps WHERE LOWER(email) = ?", (clean_email,))
+    conn.commit()
+    conn.close()
+    return True
+
 
 def hash_password(password: str, salt: Optional[str] = None) -> tuple[str, str]:
     """Hashes a password using PBKDF2-HMAC-SHA256 with a random salt."""
@@ -181,3 +282,5 @@ def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
             "profile_picture": user.get("profile_picture")
         }
     return None
+
+

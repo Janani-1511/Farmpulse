@@ -11,7 +11,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { loginUser, registerUser, loginWithGoogle, updateUserCity } from '../../services/api';
+import { loginUser, registerUser, loginWithGoogle, updateUserCity, resetPassword, sendOtp, verifyOtp, sendRegisterOtp, verifyRegisterOtp } from '../../services/api';
 import MagneticButton from '../components/MagneticButton';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
@@ -41,6 +41,13 @@ export default function LandingScreen({ onLoginSuccess }) {
   const [fullName, setFullName] = useState('');
   const [city, setCity] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // OTP Verification State for Password Reset & Registration
+  const [forgotStep, setForgotStep] = useState(1); // 1: Request OTP, 2: Verify OTP, 3: Set Password
+  const [otp, setOtp] = useState('');
+
+  const [registerStep, setRegisterStep] = useState(1); // 1: Enter details, 2: Verify OTP
+  const [regOtp, setRegOtp] = useState('');
 
   // District Dropdown & Focus State
   const [showDistrictDropdown, setShowDistrictDropdown] = useState(false);
@@ -91,14 +98,25 @@ export default function LandingScreen({ onLoginSuccess }) {
 
   React.useEffect(() => {
     if (response?.type === 'success') {
-      const { authentication } = response;
-      handleGoogleToken(authentication.idToken);
+      const { authentication, params } = response;
+      const token = authentication?.idToken || 
+                    authentication?.accessToken || 
+                    params?.id_token || 
+                    params?.access_token || 
+                    params?.idToken || 
+                    authentication?.id_token;
+      if (token) {
+        handleGoogleToken(token);
+      } else {
+        setLoading(false);
+        setErrorMsg('Google Sign-In completed, but no token was received.');
+      }
     } else if (response?.type === 'cancel') {
       setLoading(false);
       setErrorMsg('Google sign-in was cancelled.');
     } else if (response?.type === 'error') {
       setLoading(false);
-      setErrorMsg('Google authentication failed. Please try again.');
+      setErrorMsg('Google authentication failed. Please ensure http://localhost:8081 is added to Authorized JavaScript Origins in Google Cloud Console.');
     }
   }, [response]);
 
@@ -150,6 +168,10 @@ export default function LandingScreen({ onLoginSuccess }) {
     setFullName('');
     setCity('');
     setConfirmPassword('');
+    setOtp('');
+    setRegOtp('');
+    setForgotStep(1);
+    setRegisterStep(1);
   };
 
   const handleToggleMode = (mode) => {
@@ -160,6 +182,52 @@ export default function LandingScreen({ onLoginSuccess }) {
   const validateEmail = (val) => {
     const re = /\S+@\S+\.\S+/;
     return re.test(val);
+  };
+
+  const handleSendOtp = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!email || !email.trim()) {
+      setErrorMsg('Please enter your registered email address.');
+      return;
+    }
+    if (!validateEmail(email.trim())) {
+      setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+
+    setLoading(true);
+    const res = await sendOtp(email.trim());
+    setLoading(false);
+
+    if (res.success) {
+      setSuccessMsg(res.data?.message || 'OTP sent successfully to your email address!');
+      setForgotStep(2);
+    } else {
+      setErrorMsg(res.error || 'Failed to send OTP code. Please check your registered email.');
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!otp || otp.trim().length !== 6) {
+      setErrorMsg('Please enter the 6-digit OTP code sent to your email.');
+      return;
+    }
+
+    setLoading(true);
+    const res = await verifyOtp(email.trim(), otp.trim());
+    setLoading(false);
+
+    if (res.success) {
+      setSuccessMsg('Email verified successfully! Please enter your new password.');
+      setForgotStep(3);
+    } else {
+      setErrorMsg(res.error || 'Invalid or expired OTP code. Please check and try again.');
+    }
   };
 
   const handleSignIn = async () => {
@@ -193,14 +261,10 @@ export default function LandingScreen({ onLoginSuccess }) {
     }
   };
 
-  const handleRegister = async () => {
+  const handleRegisterSendOtp = async () => {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (!fullName || !fullName.trim()) {
-      setErrorMsg('Please enter your full name.');
-      return;
-    }
     if (!email || !email.trim()) {
       setErrorMsg('Please enter your email address.');
       return;
@@ -209,8 +273,50 @@ export default function LandingScreen({ onLoginSuccess }) {
       setErrorMsg('Please enter a valid email address.');
       return;
     }
+
+    setLoading(true);
+    const res = await sendRegisterOtp(email.trim());
+    setLoading(false);
+
+    if (res.success) {
+      setSuccessMsg(res.data?.message || 'Verification code sent to your email address! Please check your inbox.');
+      setRegisterStep(2);
+    } else {
+      setErrorMsg(res.error || 'Failed to send verification code. Please check your email.');
+    }
+  };
+
+  const handleRegisterVerifyOtp = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!regOtp || regOtp.trim().length !== 6) {
+      setErrorMsg('Please enter the 6-digit OTP code sent to your email.');
+      return;
+    }
+
+    setLoading(true);
+    const res = await verifyOtp(email.trim(), regOtp.trim());
+    setLoading(false);
+
+    if (res.success) {
+      setSuccessMsg('Email verified successfully! Please complete your account profile below.');
+      setRegisterStep(3);
+    } else {
+      setErrorMsg(res.error || 'Verification failed. Invalid or expired OTP code.');
+    }
+  };
+
+  const handleRegisterCreateProfile = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!fullName || !fullName.trim()) {
+      setErrorMsg('Please enter your full name.');
+      return;
+    }
     if (!city || !city.trim()) {
-      setErrorMsg('Please enter your city.');
+      setErrorMsg('Please select or enter your city.');
       return;
     }
     if (!password || password.length < 8) {
@@ -242,18 +348,69 @@ export default function LandingScreen({ onLoginSuccess }) {
   };
 
   const handleForgotPassword = () => {
-    Alert.alert(
-      'Reset Password',
-      'Please enter your registered email address or contact FarmPulse Support to reset your password.'
-    );
+    resetForm();
+    setAuthMode('forgot');
+  };
+
+  const handleResetPassword = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!email || !email.trim()) {
+      setErrorMsg('Please enter your registered email address.');
+      return;
+    }
+    if (!validateEmail(email.trim())) {
+      setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+    if (!password || password.length < 8) {
+      setErrorMsg('New password must be at least 8 characters long.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setErrorMsg('Passwords do not match. Please verify your new password.');
+      return;
+    }
+
+    setLoading(true);
+    const res = await resetPassword({
+      email: email.trim(),
+      new_password: password,
+    });
+    setLoading(false);
+
+    if (res.success) {
+      setSuccessMsg('Password reset successfully! Redirecting to Sign In...');
+      const savedEmail = email.trim();
+      setTimeout(() => {
+        resetForm();
+        setEmail(savedEmail);
+        setAuthMode('signin');
+      }, 1500);
+    } else {
+      setErrorMsg(res.error || 'Password reset failed. Please check your registered email.');
+    }
   };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
+
+    const clientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+    if (!clientId || clientId === 'YOUR_GOOGLE_CLIENT_ID' || clientId.includes('YOUR_')) {
+      setLoading(false);
+      setErrorMsg('Google OAuth Client ID is not configured. Please set a valid EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID in mobile/.env');
+      return;
+    }
     
     try {
+      if (!request) {
+        setLoading(false);
+        setErrorMsg('Google Auth request is not initialized. Please try again.');
+        return;
+      }
       await promptAsync();
     } catch (e) {
       setLoading(false);
@@ -522,147 +679,431 @@ export default function LandingScreen({ onLoginSuccess }) {
                       </TouchableOpacity>
                     </View>
                   </View>
-                ) : (
-                  /* CREATE ACCOUNT FORM */
+                ) : authMode === 'forgot' ? (
+                  /* FORGOT / RESET PASSWORD FORM WITH OTP VERIFICATION */
                   <View style={styles.formContent}>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Full Name</Text>
-                      <View style={[styles.inputWithIcon, focusedField === 'reg_name' && styles.inputWithIconFocused]}>
-                        <Text style={styles.inputIcon}>👤</Text>
-                        <TextInput
-                          style={styles.inputField}
-                          placeholder="Enter your full name"
-                          placeholderTextColor="#94A3B8"
-                          value={fullName}
-                          onChangeText={setFullName}
-                          onFocus={() => setFocusedField('reg_name')}
-                          onBlur={() => setFocusedField(null)}
-                        />
-                      </View>
+                    {/* Step indicator header */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14, backgroundColor: '#F0FDF4', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#BBF7D0' }}>
+                      <View style={{ backgroundColor: '#16A34A', width: 8, height: 8, borderRadius: 4, marginRight: 8 }} />
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#15803D', letterSpacing: 0.5 }}>
+                        STEP {forgotStep} OF 3: {forgotStep === 1 ? 'EMAIL IDENTIFICATION' : forgotStep === 2 ? 'ENTER OTP CODE' : 'CREATE NEW PASSWORD'}
+                      </Text>
                     </View>
 
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Email Address</Text>
-                      <View style={[styles.inputWithIcon, focusedField === 'reg_email' && styles.inputWithIconFocused]}>
-                        <Text style={styles.inputIcon}>✉️</Text>
-                        <TextInput
-                          style={styles.inputField}
-                          placeholder="Enter your email"
-                          placeholderTextColor="#94A3B8"
-                          value={email}
-                          onChangeText={setEmail}
-                          onFocus={() => setFocusedField('reg_email')}
-                          onBlur={() => setFocusedField(null)}
-                          keyboardType="email-address"
-                          autoCapitalize="none"
-                        />
-                      </View>
-                    </View>
+                    {forgotStep === 1 ? (
+                      /* STEP 1: ENTER EMAIL & REQUEST OTP */
+                      <View>
+                        <Text style={{ fontSize: 18, fontWeight: '900', color: '#1B4332', marginBottom: 4, letterSpacing: -0.3 }}>
+                          🔑 Forgot Password
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 18, fontWeight: '500', lineHeight: 18 }}>
+                          Enter your registered email address below. We will send a 6-digit OTP code to verify your account identity.
+                        </Text>
 
-                    <View style={[styles.inputGroup, { zIndex: 10 }]}>
-                      <Text style={styles.inputLabel}>City / Tamil Nadu District</Text>
-                      <View style={[styles.inputWithIcon, focusedField === 'reg_city' && styles.inputWithIconFocused]}>
-                        <Text style={styles.inputIcon}>📍</Text>
-                        <TextInput
-                          style={styles.inputField}
-                          placeholder="Select Tamil Nadu District"
-                          placeholderTextColor="#94A3B8"
-                          value={city}
-                          onChangeText={(text) => {
-                            setCity(text);
-                            setShowDistrictDropdown(true);
-                          }}
-                          onFocus={() => {
-                            setFocusedField('reg_city');
-                            setShowDistrictDropdown(true);
-                          }}
-                          onBlur={() => setFocusedField(null)}
-                        />
-                        {city ? (
-                          <TouchableOpacity onPress={() => setCity('')} style={{ padding: 4 }}>
-                            <Text style={{ fontSize: 12, color: '#94A3B8' }}>✕</Text>
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
-
-                      {/* Tamil Nadu District Dropdown List */}
-                      {showDistrictDropdown ? (
-                        <View style={styles.districtDropdown}>
-                          <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                            {TAMILNADU_DISTRICTS.filter((d) =>
-                              d.toLowerCase().includes(city.toLowerCase())
-                            ).map((district) => (
-                              <TouchableOpacity
-                                key={district}
-                                style={styles.districtItem}
-                                onPress={() => {
-                                  setCity(district);
-                                  setShowDistrictDropdown(false);
-                                }}
-                              >
-                                <Text style={styles.districtItemText}>📍 {district}</Text>
-                              </TouchableOpacity>
-                            ))}
-                          </ScrollView>
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.inputLabel}>Registered Email Address</Text>
+                          <View style={[styles.inputWithIcon, focusedField === 'forgot_email' && styles.inputWithIconFocused]}>
+                            <Text style={styles.inputIcon}>✉️</Text>
+                            <TextInput
+                              style={styles.inputField}
+                              placeholder="Enter your registered email"
+                              placeholderTextColor="#94A3B8"
+                              value={email}
+                              onChangeText={setEmail}
+                              onFocus={() => setFocusedField('forgot_email')}
+                              onBlur={() => setFocusedField(null)}
+                              keyboardType="email-address"
+                              autoCapitalize="none"
+                            />
+                          </View>
                         </View>
-                      ) : null}
-                    </View>
 
+                        <MagneticButton>
+                          <TouchableOpacity
+                            style={styles.submitBtn}
+                            onPress={handleSendOtp}
+                            disabled={loading}
+                          >
+                            {loading ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <Text style={styles.submitBtnText}>📩 SEND OTP VERIFICATION CODE</Text>
+                            )}
+                          </TouchableOpacity>
+                        </MagneticButton>
+                      </View>
+                    ) : forgotStep === 2 ? (
+                      /* STEP 2: ENTER & VERIFY OTP CODE */
+                      <View>
+                        <Text style={{ fontSize: 18, fontWeight: '900', color: '#1B4332', marginBottom: 4, letterSpacing: -0.3 }}>
+                          🔢 Enter Verification OTP
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 18, fontWeight: '500', lineHeight: 18 }}>
+                          We sent a 6-digit verification code to <Text style={{ fontWeight: '800', color: '#0F172A' }}>{email}</Text>.
+                        </Text>
 
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Password</Text>
-                      <View style={[styles.inputWithIcon, focusedField === 'reg_pwd' && styles.inputWithIconFocused]}>
-                        <Text style={styles.inputIcon}>🔒</Text>
-                        <TextInput
-                          style={[styles.inputField, { flex: 1 }]}
-                          placeholder="Minimum 8 characters"
-                          placeholderTextColor="#94A3B8"
-                          value={password}
-                          onChangeText={setPassword}
-                          onFocus={() => setFocusedField('reg_pwd')}
-                          onBlur={() => setFocusedField(null)}
-                          secureTextEntry={!showPassword}
-                        />
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.inputLabel}>6-Digit OTP Code</Text>
+                          <View style={[styles.inputWithIcon, focusedField === 'forgot_otp' && styles.inputWithIconFocused]}>
+                            <Text style={styles.inputIcon}>🔑</Text>
+                            <TextInput
+                              style={[styles.inputField, { letterSpacing: 4, fontSize: 16, fontWeight: '800' }]}
+                              placeholder="e.g. 123456"
+                              placeholderTextColor="#94A3B8"
+                              value={otp}
+                              onChangeText={setOtp}
+                              onFocus={() => setFocusedField('forgot_otp')}
+                              onBlur={() => setFocusedField(null)}
+                              keyboardType="number-pad"
+                              maxLength={6}
+                            />
+                          </View>
+                        </View>
+
+                        <MagneticButton>
+                          <TouchableOpacity
+                            style={styles.submitBtn}
+                            onPress={handleVerifyOtp}
+                            disabled={loading}
+                          >
+                            {loading ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <Text style={styles.submitBtnText}>✅ VERIFY OTP CODE</Text>
+                            )}
+                          </TouchableOpacity>
+                        </MagneticButton>
+
                         <TouchableOpacity
-                          style={styles.eyeBtn}
-                          onPress={() => setShowPassword(!showPassword)}
+                          style={{ marginTop: 14, alignItems: 'center' }}
+                          onPress={handleSendOtp}
+                          disabled={loading}
                         >
-                          <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '🙈'}</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#0284C7' }}>
+                            Didn't receive code? Resend OTP
+                          </Text>
                         </TouchableOpacity>
                       </View>
-                    </View>
+                    ) : (
+                      /* STEP 3: CREATE NEW PASSWORD */
+                      <View>
+                        <Text style={{ fontSize: 18, fontWeight: '900', color: '#1B4332', marginBottom: 4, letterSpacing: -0.3 }}>
+                          🔒 Set New Password
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 18, fontWeight: '500', lineHeight: 18 }}>
+                          Your email identity is verified! Choose a new password for <Text style={{ fontWeight: '800', color: '#0F172A' }}>{email}</Text>.
+                        </Text>
 
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Confirm Password</Text>
-                      <View style={[styles.inputWithIcon, focusedField === 'reg_cpwd' && styles.inputWithIconFocused]}>
-                        <Text style={styles.inputIcon}>🔒</Text>
-                        <TextInput
-                          style={styles.inputField}
-                          placeholder="Re-enter password"
-                          placeholderTextColor="#94A3B8"
-                          value={confirmPassword}
-                          onChangeText={setConfirmPassword}
-                          onFocus={() => setFocusedField('reg_cpwd')}
-                          onBlur={() => setFocusedField(null)}
-                          secureTextEntry={!showPassword}
-                        />
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.inputLabel}>New Password</Text>
+                          <View style={[styles.inputWithIcon, focusedField === 'forgot_pwd' && styles.inputWithIconFocused]}>
+                            <Text style={styles.inputIcon}>🔒</Text>
+                            <TextInput
+                              style={[styles.inputField, { flex: 1 }]}
+                              placeholder="Minimum 8 characters"
+                              placeholderTextColor="#94A3B8"
+                              value={password}
+                              onChangeText={setPassword}
+                              onFocus={() => setFocusedField('forgot_pwd')}
+                              onBlur={() => setFocusedField(null)}
+                              secureTextEntry={!showPassword}
+                            />
+                            <TouchableOpacity
+                              style={styles.eyeBtn}
+                              onPress={() => setShowPassword(!showPassword)}
+                            >
+                              <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '🙈'}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.inputLabel}>Confirm New Password</Text>
+                          <View style={[styles.inputWithIcon, focusedField === 'forgot_cpwd' && styles.inputWithIconFocused]}>
+                            <Text style={styles.inputIcon}>🔒</Text>
+                            <TextInput
+                              style={styles.inputField}
+                              placeholder="Re-enter new password"
+                              placeholderTextColor="#94A3B8"
+                              value={confirmPassword}
+                              onChangeText={setConfirmPassword}
+                              onFocus={() => setFocusedField('forgot_cpwd')}
+                              onBlur={() => setFocusedField(null)}
+                              secureTextEntry={!showPassword}
+                            />
+                          </View>
+                        </View>
+
+                        <MagneticButton>
+                          <TouchableOpacity
+                            style={styles.submitBtn}
+                            onPress={handleResetPassword}
+                            disabled={loading}
+                          >
+                            {loading ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <Text style={styles.submitBtnText}>🔐 RESET PASSWORD</Text>
+                            )}
+                          </TouchableOpacity>
+                        </MagneticButton>
                       </View>
+                    )}
+
+                    <View style={styles.switchRow}>
+                      <Text style={styles.switchText}>Remembered your password? </Text>
+                      <TouchableOpacity onPress={() => handleToggleMode('signin')}>
+                        <Text style={styles.switchLink}>Back to Sign In</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  /* CREATE ACCOUNT FORM: EMAIL VERIFICATION FIRST SEQUENCE */
+                  <View style={styles.formContent}>
+                    {/* Step indicator header */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14, backgroundColor: '#F0FDF4', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#BBF7D0' }}>
+                      <View style={{ backgroundColor: '#16A34A', width: 8, height: 8, borderRadius: 4, marginRight: 8 }} />
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#15803D', letterSpacing: 0.5 }}>
+                        STEP {registerStep} OF 3: {registerStep === 1 ? 'EMAIL VERIFICATION' : registerStep === 2 ? 'ENTER OTP CODE' : 'CREATE ACCOUNT PROFILE'}
+                      </Text>
                     </View>
 
+                    {registerStep === 1 ? (
+                      /* STEP 1: ENTER EMAIL & SEND OTP */
+                      <View>
+                        <Text style={{ fontSize: 18, fontWeight: '900', color: '#1B4332', marginBottom: 4, letterSpacing: -0.3 }}>
+                          🌱 Create Account
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 18, fontWeight: '500', lineHeight: 18 }}>
+                          Enter your email address below. We will send a 6-digit OTP code to verify your email before creating your account.
+                        </Text>
 
-                    <MagneticButton>
-                      <TouchableOpacity
-                        style={styles.submitBtn}
-                        onPress={handleRegister}
-                        disabled={loading}
-                      >
-                        {loading ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <Text style={styles.submitBtnText}>Create Account</Text>
-                        )}
-                      </TouchableOpacity>
-                    </MagneticButton>
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.inputLabel}>Email Address</Text>
+                          <View style={[styles.inputWithIcon, focusedField === 'reg_email' && styles.inputWithIconFocused]}>
+                            <Text style={styles.inputIcon}>✉️</Text>
+                            <TextInput
+                              style={styles.inputField}
+                              placeholder="Enter your email address"
+                              placeholderTextColor="#94A3B8"
+                              value={email}
+                              onChangeText={setEmail}
+                              onFocus={() => setFocusedField('reg_email')}
+                              onBlur={() => setFocusedField(null)}
+                              keyboardType="email-address"
+                              autoCapitalize="none"
+                            />
+                          </View>
+                        </View>
+
+                        <MagneticButton>
+                          <TouchableOpacity
+                            style={styles.submitBtn}
+                            onPress={handleRegisterSendOtp}
+                            disabled={loading}
+                          >
+                            {loading ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <Text style={styles.submitBtnText}>📩 SEND VERIFICATION CODE</Text>
+                            )}
+                          </TouchableOpacity>
+                        </MagneticButton>
+                      </View>
+                    ) : registerStep === 2 ? (
+                      /* STEP 2: ENTER & VERIFY OTP CODE */
+                      <View>
+                        <Text style={{ fontSize: 18, fontWeight: '900', color: '#1B4332', marginBottom: 4, letterSpacing: -0.3 }}>
+                          🔢 Verify Email Address
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 18, fontWeight: '500', lineHeight: 18 }}>
+                          We sent a 6-digit verification code to <Text style={{ fontWeight: '800', color: '#0F172A' }}>{email}</Text>. Please enter it below.
+                        </Text>
+
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.inputLabel}>6-Digit OTP Verification Code</Text>
+                          <View style={[styles.inputWithIcon, focusedField === 'reg_otp' && styles.inputWithIconFocused]}>
+                            <Text style={styles.inputIcon}>🔑</Text>
+                            <TextInput
+                              style={[styles.inputField, { letterSpacing: 4, fontSize: 16, fontWeight: '800' }]}
+                              placeholder="e.g. 123456"
+                              placeholderTextColor="#94A3B8"
+                              value={regOtp}
+                              onChangeText={setRegOtp}
+                              onFocus={() => setFocusedField('reg_otp')}
+                              onBlur={() => setFocusedField(null)}
+                              keyboardType="number-pad"
+                              maxLength={6}
+                            />
+                          </View>
+                        </View>
+
+                        <MagneticButton>
+                          <TouchableOpacity
+                            style={styles.submitBtn}
+                            onPress={handleRegisterVerifyOtp}
+                            disabled={loading}
+                          >
+                            {loading ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <Text style={styles.submitBtnText}>✅ VERIFY OTP CODE</Text>
+                            )}
+                          </TouchableOpacity>
+                        </MagneticButton>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 }}>
+                          <TouchableOpacity onPress={handleRegisterSendOtp} disabled={loading}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#0284C7' }}>
+                              Resend Code
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity onPress={() => setRegisterStep(1)} disabled={loading}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#64748B' }}>
+                              ✏️ Change Email
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      /* STEP 3: FILL ACCOUNT DETAILS (ONLY AFTER EMAIL VERIFICATION!) */
+                      <View>
+                        {/* Verified Email Banner Badge */}
+                        <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, marginBottom: 16, borderWidth: 1, borderColor: '#86EFAC', flexDirection: 'row', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 14, marginRight: 6 }}>✅</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#166534' }}>
+                            Email Verified: {email}
+                          </Text>
+                        </View>
+
+                        <Text style={{ fontSize: 18, fontWeight: '900', color: '#1B4332', marginBottom: 4, letterSpacing: -0.3 }}>
+                          👤 Complete Profile Details
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 18, fontWeight: '500', lineHeight: 18 }}>
+                          Please enter your name, location, and set a password to finalize your FarmPulse account.
+                        </Text>
+
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.inputLabel}>Full Name</Text>
+                          <View style={[styles.inputWithIcon, focusedField === 'reg_name' && styles.inputWithIconFocused]}>
+                            <Text style={styles.inputIcon}>👤</Text>
+                            <TextInput
+                              style={styles.inputField}
+                              placeholder="Enter your full name"
+                              placeholderTextColor="#94A3B8"
+                              value={fullName}
+                              onChangeText={setFullName}
+                              onFocus={() => setFocusedField('reg_name')}
+                              onBlur={() => setFocusedField(null)}
+                            />
+                          </View>
+                        </View>
+
+                        <View style={[styles.inputGroup, { zIndex: 10 }]}>
+                          <Text style={styles.inputLabel}>City / Tamil Nadu District</Text>
+                          <View style={[styles.inputWithIcon, focusedField === 'reg_city' && styles.inputWithIconFocused]}>
+                            <Text style={styles.inputIcon}>📍</Text>
+                            <TextInput
+                              style={styles.inputField}
+                              placeholder="Select Tamil Nadu District"
+                              placeholderTextColor="#94A3B8"
+                              value={city}
+                              onChangeText={(text) => {
+                                setCity(text);
+                                setShowDistrictDropdown(true);
+                              }}
+                              onFocus={() => {
+                                setFocusedField('reg_city');
+                                setShowDistrictDropdown(true);
+                              }}
+                              onBlur={() => setFocusedField(null)}
+                            />
+                            {city ? (
+                              <TouchableOpacity onPress={() => setCity('')} style={{ padding: 4 }}>
+                                <Text style={{ fontSize: 12, color: '#94A3B8' }}>✕</Text>
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+
+                          {/* Tamil Nadu District Dropdown List */}
+                          {showDistrictDropdown ? (
+                            <View style={styles.districtDropdown}>
+                              <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                                {TAMILNADU_DISTRICTS.filter((d) =>
+                                  d.toLowerCase().includes(city.toLowerCase())
+                                ).map((district) => (
+                                  <TouchableOpacity
+                                    key={district}
+                                    style={styles.districtItem}
+                                    onPress={() => {
+                                      setCity(district);
+                                      setShowDistrictDropdown(false);
+                                    }}
+                                  >
+                                    <Text style={styles.districtItemText}>📍 {district}</Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </ScrollView>
+                            </View>
+                          ) : null}
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.inputLabel}>Password</Text>
+                          <View style={[styles.inputWithIcon, focusedField === 'reg_pwd' && styles.inputWithIconFocused]}>
+                            <Text style={styles.inputIcon}>🔒</Text>
+                            <TextInput
+                              style={[styles.inputField, { flex: 1 }]}
+                              placeholder="Minimum 8 characters"
+                              placeholderTextColor="#94A3B8"
+                              value={password}
+                              onChangeText={setPassword}
+                              onFocus={() => setFocusedField('reg_pwd')}
+                              onBlur={() => setFocusedField(null)}
+                              secureTextEntry={!showPassword}
+                            />
+                            <TouchableOpacity
+                              style={styles.eyeBtn}
+                              onPress={() => setShowPassword(!showPassword)}
+                            >
+                              <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '🙈'}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.inputLabel}>Confirm Password</Text>
+                          <View style={[styles.inputWithIcon, focusedField === 'reg_cpwd' && styles.inputWithIconFocused]}>
+                            <Text style={styles.inputIcon}>🔒</Text>
+                            <TextInput
+                              style={styles.inputField}
+                              placeholder="Re-enter password"
+                              placeholderTextColor="#94A3B8"
+                              value={confirmPassword}
+                              onChangeText={setConfirmPassword}
+                              onFocus={() => setFocusedField('reg_cpwd')}
+                              onBlur={() => setFocusedField(null)}
+                              secureTextEntry={!showPassword}
+                            />
+                          </View>
+                        </View>
+
+                        <MagneticButton>
+                          <TouchableOpacity
+                            style={styles.submitBtn}
+                            onPress={handleRegisterCreateProfile}
+                            disabled={loading}
+                          >
+                            {loading ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <Text style={styles.submitBtnText}>🚀 COMPLETE REGISTRATION & SIGN IN</Text>
+                            )}
+                          </TouchableOpacity>
+                        </MagneticButton>
+                      </View>
+                    )}
 
                     <View style={styles.switchRow}>
                       <Text style={styles.switchText}>Already have an account? </Text>

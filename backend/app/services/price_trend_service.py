@@ -91,6 +91,7 @@ def get_price_trend_analysis(
     # Generate ML Predictions for future days
     predicted_points = []
     num_future = max(1, min(60, future_days))
+    base_price = float(latest_hist["price_quintal"])
 
     for i in range(1, num_future + 1):
         future_dt = latest_date_dt + pd.Timedelta(days=i)
@@ -99,7 +100,8 @@ def get_price_trend_analysis(
         pred_res = predict_crop_price(
             crop=crop,
             market_id=market_id,
-            target_date_str=future_date_str
+            target_date_str=future_date_str,
+            base_modal_price=base_price
         )
         
         pred_q = round(float(pred_res.get("predicted_price", latest_hist["price_quintal"])), 2)

@@ -19,6 +19,8 @@ class MarketResultItem(BaseModel):
     longitude: float
     market_type: str
     distance_km: float
+    distance_type: str = "road"
+    distance_method: str = "OSRM Road Driving Distance Routing"
     current_price: float
     predicted_price: float
     transport_cost: float

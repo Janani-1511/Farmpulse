@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Modal, ScrollView } from 'react-native';
 
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -34,6 +34,25 @@ export default function DateSelector({ targetDate, onChangeDate }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Auto-correct any past targetDate back to today
+  useEffect(() => {
+    if (targetDate && targetDate.length === 10) {
+      const parts = targetDate.split('-').map(Number);
+      const chosenDt = new Date(parts[0], parts[1] - 1, parts[2]);
+      chosenDt.setHours(0, 0, 0, 0);
+
+      const todayNoTime = new Date();
+      todayNoTime.setHours(0, 0, 0, 0);
+
+      if (chosenDt < todayNoTime) {
+        const y = todayNoTime.getFullYear();
+        const m = String(todayNoTime.getMonth() + 1).padStart(2, '0');
+        const d = String(todayNoTime.getDate()).padStart(2, '0');
+        onChangeDate(`${y}-${m}-${d}`);
+      }
+    }
+  }, [targetDate]);
+
   // Calendar calculations for viewDate
   const viewYear = viewDate.getFullYear();
   const viewMonth = viewDate.getMonth();
@@ -41,8 +60,14 @@ export default function DateSelector({ targetDate, onChangeDate }) {
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
 
+  const currentMonthFirstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  const isPrevMonthDisabled = new Date(viewYear, viewMonth - 1, 1) < currentMonthFirstDay;
+
   const handlePrevMonth = () => {
     const newMonth = new Date(viewYear, viewMonth - 1, 1);
+    if (newMonth < currentMonthFirstDay) {
+      return;
+    }
     setViewDate(newMonth);
   };
 
@@ -115,8 +140,8 @@ export default function DateSelector({ targetDate, onChangeDate }) {
         <TouchableOpacity style={styles.presetBtn} onPress={() => handlePreset(30)}>
           <Text style={styles.presetBtnText}>+30 Days</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.presetBtn} onPress={() => onChangeDate('2026-09-15')}>
-          <Text style={styles.presetBtnText}>15 Sept 2026</Text>
+        <TouchableOpacity style={styles.presetBtn} onPress={() => handlePreset(45)}>
+          <Text style={styles.presetBtnText}>+45 Days</Text>
         </TouchableOpacity>
       </View>
 
@@ -132,7 +157,11 @@ export default function DateSelector({ targetDate, onChangeDate }) {
             
             {/* Calendar Header with Prev/Next Month Controls */}
             <View style={styles.monthHeader}>
-              <TouchableOpacity style={styles.navBtn} onPress={handlePrevMonth}>
+              <TouchableOpacity
+                style={[styles.navBtn, isPrevMonthDisabled && { opacity: 0.3 }]}
+                onPress={handlePrevMonth}
+                disabled={isPrevMonthDisabled}
+              >
                 <Text style={styles.navBtnText}>◀</Text>
               </TouchableOpacity>
 

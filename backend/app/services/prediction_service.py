@@ -53,7 +53,8 @@ def predict_crop_price(
     crop: str,
     market_id: str,
     target_date_str: str,
-    price_modifier: float = 1.0
+    price_modifier: float = 1.0,
+    base_modal_price: Optional[float] = None
 ) -> Dict[str, Any]:
     """
     Predicts modal price per quintal for the given crop, market, and target future date using trained ML model.
@@ -68,7 +69,10 @@ def predict_crop_price(
     except Exception:
         target_dt = pd.Timestamp.now()
         
-    current_modal_price = get_real_market_latest_price(crop, market_id)
+    if base_modal_price is not None:
+        current_modal_price = base_modal_price
+    else:
+        current_modal_price = get_real_market_latest_price(crop, market_id)
     
     if current_modal_price is None:
         return {
