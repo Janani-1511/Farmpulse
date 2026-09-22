@@ -64,6 +64,8 @@ def _analyze_single_market(mkt: Dict[str, Any], user_lat: float, user_lon: float
                 "distance_method": dist_method,
                 "current_price": prices["current_price"],
                 "predicted_price": prices["predicted_price"],
+                "model_status": prices.get("model_status"),
+                "is_ml_model": prices.get("is_ml_model", False),
                 "transport_cost": transport,
                 "expected_revenue": revenue["expected_gross_revenue"],
                 "estimated_net_revenue": revenue["estimated_net_revenue"],

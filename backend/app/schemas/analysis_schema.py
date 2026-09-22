@@ -23,6 +23,8 @@ class MarketResultItem(BaseModel):
     distance_method: str = "OSRM Road Driving Distance Routing"
     current_price: float
     predicted_price: float
+    model_status: Optional[str] = None
+    is_ml_model: Optional[bool] = None
     transport_cost: float
     expected_revenue: float
     estimated_net_revenue: float
