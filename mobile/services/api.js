@@ -2,10 +2,10 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 
 const getBaseUrl = () => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname) {
-    return `http://${window.location.hostname}:8000/api`;
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
   }
-  return 'http://127.0.0.1:8000/api';
+  return 'https://farmpulse-zeta.vercel.app/api';
 };
 
 const API_BASE_URL = getBaseUrl();

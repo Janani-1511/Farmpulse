@@ -15,6 +15,7 @@ import { loginUser, registerUser, loginWithGoogle, updateUserCity, resetPassword
 import MagneticButton from '../components/MagneticButton';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -54,10 +55,15 @@ export default function LandingScreen({ onLoginSuccess }) {
   const [focusedField, setFocusedField] = useState(null);
 
   // Google Auth Setup
+  const customRedirectUri = Platform.OS === 'web' 
+    ? (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081')
+    : makeRedirectUri({ scheme: 'farmpulse' });
+
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID',
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    redirectUri: customRedirectUri,
   });
 
   // City Completion State
@@ -116,7 +122,7 @@ export default function LandingScreen({ onLoginSuccess }) {
       setErrorMsg('Google sign-in was cancelled.');
     } else if (response?.type === 'error') {
       setLoading(false);
-      setErrorMsg('Google authentication failed. Please ensure http://localhost:8081 is added to Authorized JavaScript Origins in Google Cloud Console.');
+      setErrorMsg(`Google authentication failed. Please ensure ${customRedirectUri} and ${customRedirectUri}/ are added to Authorized JavaScript Origins and Authorized Redirect URIs in Google Cloud Console.`);
     }
   }, [response]);
 
@@ -411,10 +417,13 @@ export default function LandingScreen({ onLoginSuccess }) {
         setErrorMsg('Google Auth request is not initialized. Please try again.');
         return;
       }
+      if (request?.redirectUri) {
+        console.log('FarmPulse Google OAuth redirectUri:', request.redirectUri);
+      }
       await promptAsync();
     } catch (e) {
       setLoading(false);
-      setErrorMsg('Failed to open Google Auth. Please check your configuration.');
+      setErrorMsg(`Failed to open Google Auth. URI: ${request?.redirectUri || 'unknown'}`);
     }
   };
 
