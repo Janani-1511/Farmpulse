@@ -53,14 +53,34 @@ export default function App() {
     setCurrentUser(userData);
   };
 
-  // Inject global CSS rule to strip default web browser blue outline and apply theme neon green glow
+  // Inject global CSS rules for viewport reset, focus ring, and box-sizing
   useEffect(() => {
     if (typeof document !== 'undefined') {
+      // Ensure viewport meta tag is properly set
+      let meta = document.querySelector("meta[name='viewport']");
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'viewport';
+        document.head.appendChild(meta);
+      }
+      meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
+
       const styleId = 'farmpulse-theme-focus-ring';
       if (!document.getElementById(styleId)) {
         const style = document.createElement('style');
         style.id = styleId;
         style.innerHTML = `
+          html, body, #root {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow-x: hidden !important;
+            box-sizing: border-box !important;
+          }
+          *, *:before, *:after {
+            box-sizing: border-box !important;
+          }
           input, textarea, select, [role="textbox"] {
             padding-left: 10px !important;
           }
@@ -316,7 +336,7 @@ export default function App() {
                       onPress={handleRunAnalysis}
                       disabled={analyzing}
                     >
-                      <Text style={styles.submitBtnText}>🚀 ANALYZE MARKET PRICES & NET REVENUE</Text>
+                      <Text style={styles.submitBtnText}>ANALYZE MARKET PRICES & NET REVENUE</Text>
                     </TouchableOpacity>
                   </MagneticButton>
                 </View>
@@ -440,18 +460,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+    width: '100%',
   },
   scrollContent: {
     paddingBottom: 40,
+    width: '100%',
   },
   mainWrapper: {
     maxWidth: 1200,
     alignSelf: 'center',
     width: '100%',
-    padding: 16,
+    padding: 12,
+    overflow: 'hidden',
   },
   heroContainer: {
-    height: 220,
+    minHeight: 200,
     borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 20,
@@ -468,7 +491,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   badgeContainer: {
     backgroundColor: '#DCFCE7',
@@ -482,18 +505,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
+    textAlign: 'center',
   },
   title: {
-    fontSize: 34,
+    fontSize: 28,
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: -0.5,
+    textAlign: 'center',
   },
   tagline: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     color: '#86EFAC',
     marginTop: 2,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 12,
@@ -501,7 +527,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     lineHeight: 16,
-    paddingHorizontal: 15,
+    paddingHorizontal: 10,
     fontWeight: '500',
   },
   heroActionRow: {
@@ -536,7 +562,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 20,
+    padding: 14,
     marginBottom: 20,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
@@ -545,6 +571,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 12,
     elevation: 3,
+    width: '100%',
   },
   cardHeader: {
     fontSize: 16,

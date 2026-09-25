@@ -117,8 +117,17 @@ export default function MarketDetailModal({ visible, market, crop, quantity, onC
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
     backgroundColor: 'rgba(15, 23, 42, 0.4)',
     justifyContent: 'flex-end',
+    alignItems: 'center',
+    zIndex: 999999,
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
@@ -126,6 +135,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 20,
     maxHeight: '85%',
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    boxSizing: 'border-box',
     borderWidth: 1,
     borderColor: '#CBD5E1',
     shadowColor: '#000',

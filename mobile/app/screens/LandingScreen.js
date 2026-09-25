@@ -99,10 +99,6 @@ export default function LandingScreen({ onLoginSuccess }) {
             <View style={styles.authColumn}>
               <View style={styles.authCard}>
                 <View style={{ padding: 24, alignItems: 'center' }}>
-                  <View style={styles.tryBadge}>
-                    <Text style={styles.tryBadgeText}>⚡ INSTANT ACCESS</Text>
-                  </View>
-
                   <Text style={styles.tryTitle}>Explore Market Intelligence</Text>
                   
                   <Text style={styles.tryDescription}>
@@ -122,10 +118,6 @@ export default function LandingScreen({ onLoginSuccess }) {
                       <Text style={styles.tryFeatureIcon}>✅</Text>
                       <Text style={styles.tryFeatureText}>District Grocery Retail Comparison</Text>
                     </View>
-                    <View style={styles.tryFeatureRow}>
-                      <Text style={styles.tryFeatureIcon}>✅</Text>
-                      <Text style={styles.tryFeatureText}>No Account or Registration Required</Text>
-                    </View>
                   </View>
 
                   {/* Main Try Analysis CTA Button */}
@@ -135,7 +127,7 @@ export default function LandingScreen({ onLoginSuccess }) {
                       onPress={handleTryAnalysis}
                       activeOpacity={0.85}
                     >
-                      <Text style={styles.tryAnalysisBtnText}>🚀 Try Analysis</Text>
+                      <Text style={styles.tryAnalysisBtnText}>Try Analysis</Text>
                     </TouchableOpacity>
                   </MagneticButton>
 
@@ -184,8 +176,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   introColumn: {
-    flex: 1,
-    minWidth: 320,
+    width: '100%',
+    maxWidth: 480,
     alignItems: 'center',
     textAlign: 'center',
   },
@@ -227,6 +219,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 420,
+    width: '100%',
     marginBottom: 24,
   },
   featureGrid: {
@@ -237,11 +230,12 @@ const styles = StyleSheet.create({
   featureRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20,
+    gap: 12,
+    flexWrap: 'wrap',
   },
   featureItem: {
     alignItems: 'center',
-    width: 90,
+    width: 85,
   },
   featureIconCircle: {
     width: 52,
@@ -272,8 +266,7 @@ const styles = StyleSheet.create({
 
   /* CTA CARD STYLES */
   authColumn: {
-    flex: 1,
-    minWidth: 320,
+    width: '100%',
     maxWidth: 450,
   },
   authCard: {

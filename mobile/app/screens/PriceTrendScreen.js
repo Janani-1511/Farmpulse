@@ -676,8 +676,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   insightTile: {
-    width: '31%',
-    minWidth: 150,
+    flex: 1,
+    minWidth: 140,
     backgroundColor: '#F8FAFC',
     borderRadius: 12,
     padding: 12,
