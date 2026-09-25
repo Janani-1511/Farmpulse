@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     ROUTING_PROVIDER: str = "osrm"
     ROUTING_API_KEY: str = ""
 
+    # AWS DynamoDB Configuration
+    DYNAMODB_USERS_TABLE: str = "FarmPulseUsers"
+    DYNAMODB_OTP_TABLE: str = "FarmPulseOTPs"
+
     # AWS S3 Model Storage Configuration
     AWS_S3_BUCKET: str = "farmpulse-ml-models"
     AWS_S3_MODEL_KEY: str = "price_model_compressed.pkl"

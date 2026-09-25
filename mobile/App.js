@@ -27,7 +27,6 @@ import MarketDetailModal from './app/components/MarketDetailModal';
 import PriceHistoryScreen from './app/screens/PriceHistoryScreen';
 import RetailPricesScreen from './app/screens/RetailPricesScreen';
 import MarketsDirectoryScreen from './app/screens/MarketsDirectoryScreen';
-import UserProfileScreen from './app/screens/UserProfileScreen';
 import LandingScreen from './app/screens/LandingScreen';
 import PriceTrendScreen from './app/screens/PriceTrendScreen';
 
@@ -52,10 +51,6 @@ export default function App() {
 
   const handleLoginSuccess = (userData) => {
     setCurrentUser(userData);
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
   };
 
   // Inject global CSS rule to strip default web browser blue outline and apply theme neon green glow
@@ -222,13 +217,11 @@ export default function App() {
       {/* Top Scroll Depth Progress Indicator */}
       <ScrollProgress />
 
-      {/* Modern Website Header Navbar with Profile Badge & Logout */}
+      {/* Modern Website Header Navbar */}
       <Navbar
         activePage={activePage}
         onNavigate={(page) => setActivePage(page)}
-        healthStatus={healthStatus}
-        currentUser={currentUser}
-        onLogout={handleLogout}
+        onBack={() => setCurrentUser(null)}
       />
 
 
@@ -422,16 +415,9 @@ export default function App() {
           ) : activePage === 'retail' ? (
             /* PAGE 3: GROCERY SHOP RETAIL CROP PRICES */
             <RetailPricesScreen />
-          ) : activePage === 'markets' ? (
+          ) : (
             /* PAGE 4: REGIONAL AGRICULTURAL MARKETS NETWORK */
             <MarketsDirectoryScreen />
-          ) : (
-            /* PAGE 5: USER PROFILE & REGISTERED ACCOUNT DETAILS */
-            <UserProfileScreen
-              currentUser={currentUser}
-              onLogout={handleLogout}
-              onNavigate={(page) => setActivePage(page)}
-            />
           )}
 
 

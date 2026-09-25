@@ -1,142 +1,47 @@
-import sqlite3
 import os
 import hashlib
 import secrets
-from datetime import datetime
+import random
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
+from decimal import Decimal
+import boto3
+from boto3.dynamodb.conditions import Key, Attr
+from app.utils.config import settings
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "farmpulse.db")
+def _clean_dynamodb_item(item: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not item:
+        return None
+    cleaned = {}
+    for k, v in item.items():
+        if isinstance(v, Decimal):
+            if v % 1 == 0:
+                cleaned[k] = int(v)
+            else:
+                cleaned[k] = float(v)
+        else:
+            cleaned[k] = v
+    return cleaned
 
-def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+def get_dynamodb_resource():
+    kwargs = {"region_name": settings.AWS_REGION}
+    if getattr(settings, "AWS_ACCESS_KEY_ID", None) and getattr(settings, "AWS_SECRET_ACCESS_KEY", None):
+        if settings.AWS_ACCESS_KEY_ID.strip() and settings.AWS_SECRET_ACCESS_KEY.strip():
+            kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID.strip()
+            kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY.strip()
+    return boto3.resource("dynamodb", **kwargs)
+
+def get_users_table():
+    table_name = getattr(settings, "DYNAMODB_USERS_TABLE", "FarmPulseUsers")
+    return get_dynamodb_resource().Table(table_name)
+
+def get_otp_table():
+    table_name = getattr(settings, "DYNAMODB_OTP_TABLE", "FarmPulseOTPs")
+    return get_dynamodb_resource().Table(table_name)
 
 def init_users_db():
-    """Initializes the users database table and OTP table if they do not exist."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            full_name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            city TEXT NOT NULL,
-            password_hash TEXT NOT NULL,
-            salt TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS password_reset_otps (
-            email TEXT PRIMARY KEY,
-            otp TEXT NOT NULL,
-            expires_at TEXT NOT NULL,
-            verified INTEGER DEFAULT 0
-        )
-    """)
-    # Safely add Google Auth columns to existing table
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'password'")
-        cursor.execute("ALTER TABLE users ADD COLUMN google_id TEXT")
-        cursor.execute("ALTER TABLE users ADD COLUMN profile_picture TEXT")
-    except sqlite3.OperationalError:
-        pass # Columns already exist
-    conn.commit()
-    conn.close()
-
-def generate_and_store_otp(email: str) -> str:
-    """Generates a 6-digit OTP and stores it for whatever email address is typed by the user."""
-    import random
-    from datetime import timedelta
-    
-    init_users_db()
-    clean_email = email.strip().lower()
-
-    otp = f"{random.randint(100000, 999999)}"
-    expires_at = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO password_reset_otps (email, otp, expires_at, verified)
-        VALUES (?, ?, ?, 0)
-        ON CONFLICT(email) DO UPDATE SET
-            otp = excluded.otp,
-            expires_at = excluded.expires_at,
-            verified = 0
-    """, (clean_email, otp, expires_at))
-    conn.commit()
-    conn.close()
-
-    return otp
-
-def verify_otp_code(email: str, otp: str) -> bool:
-    """Verifies if the submitted OTP matches and is not expired."""
-    init_users_db()
-    clean_email = email.strip().lower()
-    clean_otp = otp.strip()
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM password_reset_otps WHERE LOWER(email) = ?", (clean_email,))
-    row = cursor.fetchone()
-
-    if not row:
-        conn.close()
-        raise ValueError("No OTP request found for this email address. Please request a new OTP.")
-
-    row_dict = dict(row)
-    expires_at = datetime.fromisoformat(row_dict["expires_at"])
-
-    if datetime.utcnow() > expires_at:
-        conn.close()
-        raise ValueError("The OTP code has expired. Please request a new code.")
-
-    if row_dict["otp"] != clean_otp:
-        conn.close()
-        raise ValueError("Invalid OTP code. Please check and try again.")
-
-    cursor.execute("UPDATE password_reset_otps SET verified = 1 WHERE LOWER(email) = ?", (clean_email,))
-    conn.commit()
-    conn.close()
-    return True
-
-def reset_password(email: str, new_password: str) -> bool:
-    """Resets or sets user password by email address after OTP verification."""
-    init_users_db()
-    clean_email = email.strip().lower()
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT verified FROM password_reset_otps WHERE LOWER(email) = ?", (clean_email,))
-    row = cursor.fetchone()
-    if not row or dict(row).get("verified") != 1:
-        conn.close()
-        raise ValueError("Email verification required. Please request and verify OTP first.")
-
-    user = get_user_by_email(clean_email)
-    pwd_hash, salt = hash_password(new_password)
-
-    if user:
-        cursor.execute("""
-            UPDATE users
-            SET password_hash = ?, salt = ?
-            WHERE id = ?
-        """, (pwd_hash, salt, user["id"]))
-    else:
-        created_at = datetime.utcnow().isoformat()
-        name_from_email = clean_email.split('@')[0].capitalize()
-        cursor.execute("""
-            INSERT INTO users (full_name, email, city, password_hash, salt, created_at, auth_provider)
-            VALUES (?, ?, 'Coimbatore', ?, ?, ?, 'password')
-        """, (name_from_email, clean_email, pwd_hash, salt, created_at))
-
-    cursor.execute("DELETE FROM password_reset_otps WHERE LOWER(email) = ?", (clean_email,))
-    conn.commit()
-    conn.close()
-    return True
-
+    """No-op for DynamoDB persistence (tables created out-of-band in AWS)."""
+    pass
 
 def hash_password(password: str, salt: Optional[str] = None) -> tuple[str, str]:
     """Hashes a password using PBKDF2-HMAC-SHA256 with a random salt."""
@@ -150,32 +55,113 @@ def hash_password(password: str, salt: Optional[str] = None) -> tuple[str, str]:
     )
     return key.hex(), salt
 
+def generate_and_store_otp(email: str) -> str:
+    """Generates a 6-digit OTP and stores it in DynamoDB for the given email."""
+    clean_email = email.strip().lower()
+    otp = f"{random.randint(100000, 999999)}"
+    expires_at = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+
+    table = get_otp_table()
+    table.put_item(
+        Item={
+            "email": clean_email,
+            "otp": otp,
+            "expires_at": expires_at,
+            "verified": 0
+        }
+    )
+    return otp
+
+def verify_otp_code(email: str, otp: str) -> bool:
+    """Verifies if the submitted OTP matches and is not expired."""
+    clean_email = email.strip().lower()
+    clean_otp = otp.strip()
+
+    table = get_otp_table()
+    response = table.get_item(Key={"email": clean_email})
+    raw_item = response.get("Item")
+
+    if not raw_item:
+        raise ValueError("No OTP request found for this email address. Please request a new OTP.")
+
+    item = _clean_dynamodb_item(raw_item)
+    expires_at = datetime.fromisoformat(item["expires_at"])
+
+    if datetime.utcnow() > expires_at:
+        raise ValueError("The OTP code has expired. Please request a new code.")
+
+    if str(item["otp"]) != clean_otp:
+        raise ValueError("Invalid OTP code. Please check and try again.")
+
+    table.update_item(
+        Key={"email": clean_email},
+        UpdateExpression="SET verified = :v",
+        ExpressionAttributeValues={":v": 1}
+    )
+    return True
+
+def reset_password(email: str, new_password: str) -> bool:
+    """Resets or sets user password by email address after OTP verification."""
+    clean_email = email.strip().lower()
+
+    otp_table = get_otp_table()
+    response = otp_table.get_item(Key={"email": clean_email})
+    raw_otp = response.get("Item")
+    if not raw_otp or _clean_dynamodb_item(raw_otp).get("verified") != 1:
+        raise ValueError("Email verification required. Please request and verify OTP first.")
+
+    user = get_user_by_email(clean_email)
+    pwd_hash, salt = hash_password(new_password)
+    users_table = get_users_table()
+
+    if user:
+        users_table.update_item(
+            Key={"email": clean_email},
+            UpdateExpression="SET password_hash = :p, salt = :s",
+            ExpressionAttributeValues={":p": pwd_hash, ":s": salt}
+        )
+    else:
+        created_at = datetime.utcnow().isoformat()
+        name_from_email = clean_email.split('@')[0].capitalize()
+        user_id = int(datetime.utcnow().timestamp() * 1000)
+        users_table.put_item(
+            Item={
+                "email": clean_email,
+                "id": user_id,
+                "full_name": name_from_email,
+                "city": "Coimbatore",
+                "password_hash": pwd_hash,
+                "salt": salt,
+                "created_at": created_at,
+                "auth_provider": "password",
+                "google_id": "",
+                "profile_picture": ""
+            }
+        )
+
+    otp_table.delete_item(Key={"email": clean_email})
+    return True
+
 def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     """Retrieves user by email address."""
-    init_users_db()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE LOWER(email) = LOWER(?)", (email.strip(),))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return dict(row)
-    return None
+    clean_email = email.strip().lower()
+    table = get_users_table()
+    response = table.get_item(Key={"email": clean_email})
+    return _clean_dynamodb_item(response.get("Item"))
 
 def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return dict(row)
+    """Retrieves user by integer ID."""
+    table = get_users_table()
+    response = table.scan(
+        FilterExpression=Attr("id").eq(user_id)
+    )
+    items = response.get("Items", [])
+    if items:
+        return _clean_dynamodb_item(items[0])
     return None
 
 def create_user(full_name: str, email: str, city: str, password: str) -> Dict[str, Any]:
     """Creates a new user account if the email does not already exist."""
-    init_users_db()
-    
     clean_email = email.strip().lower()
     existing = get_user_by_email(clean_email)
     if existing:
@@ -183,16 +169,22 @@ def create_user(full_name: str, email: str, city: str, password: str) -> Dict[st
 
     pwd_hash, salt = hash_password(password)
     created_at = datetime.utcnow().isoformat()
+    user_id = int(datetime.utcnow().timestamp() * 1000)
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO users (full_name, email, city, password_hash, salt, created_at, auth_provider)
-        VALUES (?, ?, ?, ?, ?, ?, 'password')
-    """, (full_name.strip(), clean_email, city.strip(), pwd_hash, salt, created_at))
-    user_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
+    table = get_users_table()
+    item = {
+        "email": clean_email,
+        "id": user_id,
+        "full_name": full_name.strip(),
+        "city": city.strip(),
+        "password_hash": pwd_hash,
+        "salt": salt,
+        "created_at": created_at,
+        "auth_provider": "password",
+        "google_id": "",
+        "profile_picture": ""
+    }
+    table.put_item(Item=item)
 
     return {
         "id": user_id,
@@ -205,45 +197,48 @@ def create_user(full_name: str, email: str, city: str, password: str) -> Dict[st
 
 def get_or_create_google_user(google_id: str, email: str, full_name: str, profile_picture: str = None) -> Dict[str, Any]:
     """Finds existing user by email/google_id, or creates a new one via Google Auth."""
-    init_users_db()
-    conn = get_db_connection()
-    cursor = conn.cursor()
     clean_email = email.strip().lower()
-    
-    cursor.execute("SELECT * FROM users WHERE LOWER(email) = ?", (clean_email,))
-    row = cursor.fetchone()
-    
-    if row:
-        user = dict(row)
-        # Link account if not linked
-        if not user.get('google_id'):
-            cursor.execute("""
-                UPDATE users 
-                SET google_id = ?, auth_provider = 'google', profile_picture = COALESCE(profile_picture, ?)
-                WHERE id = ?
-            """, (google_id, profile_picture, user['id']))
-            conn.commit()
-            user['google_id'] = google_id
-            user['auth_provider'] = 'google'
-            user['profile_picture'] = user.get('profile_picture') or profile_picture
-        conn.close()
+    user = get_user_by_email(clean_email)
+    table = get_users_table()
+
+    if user:
+        if not user.get("google_id"):
+            picture_val = profile_picture or user.get("profile_picture", "")
+            table.update_item(
+                Key={"email": clean_email},
+                UpdateExpression="SET google_id = :gid, auth_provider = :ap, profile_picture = :pic",
+                ExpressionAttributeValues={
+                    ":gid": google_id,
+                    ":ap": "google",
+                    ":pic": picture_val or ""
+                }
+            )
+            user["google_id"] = google_id
+            user["auth_provider"] = "google"
+            user["profile_picture"] = picture_val
         return user
-        
-    # If user doesn't exist, create new
+
     created_at = datetime.utcnow().isoformat()
-    cursor.execute("""
-        INSERT INTO users (full_name, email, city, password_hash, salt, created_at, auth_provider, google_id, profile_picture)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (full_name.strip(), clean_email, '', '', '', created_at, 'google', google_id, profile_picture))
-    user_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    
+    user_id = int(datetime.utcnow().timestamp() * 1000)
+    item = {
+        "email": clean_email,
+        "id": user_id,
+        "full_name": full_name.strip(),
+        "city": "",
+        "password_hash": "",
+        "salt": "",
+        "created_at": created_at,
+        "auth_provider": "google",
+        "google_id": google_id,
+        "profile_picture": profile_picture or ""
+    }
+    table.put_item(Item=item)
+
     return {
         "id": user_id,
         "full_name": full_name.strip(),
         "email": clean_email,
-        "city": '',
+        "city": "",
         "created_at": created_at,
         "auth_provider": "google",
         "google_id": google_id,
@@ -251,22 +246,23 @@ def get_or_create_google_user(google_id: str, email: str, full_name: str, profil
     }
 
 def update_user_city(user_id: int, city: str) -> bool:
-    init_users_db()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET city = ? WHERE id = ?", (city.strip(), user_id))
-    conn.commit()
-    rowcount = cursor.rowcount
-    conn.close()
-    return rowcount > 0
+    user = get_user_by_id(user_id)
+    if not user:
+        return False
+    table = get_users_table()
+    table.update_item(
+        Key={"email": user["email"]},
+        UpdateExpression="SET city = :c",
+        ExpressionAttributeValues={":c": city.strip()}
+    )
+    return True
 
 def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
     """Verifies email and password credentials securely."""
-    init_users_db()
-    user = get_user_by_email(email)
+    clean_email = email.strip().lower()
+    user = get_user_by_email(clean_email)
     if not user:
         return None
-    # For users who only use Google Sign-in and have no password hash setup
     if not user.get("password_hash") or not user.get("salt"):
         return None
 
@@ -282,5 +278,3 @@ def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
             "profile_picture": user.get("profile_picture")
         }
     return None
-
-

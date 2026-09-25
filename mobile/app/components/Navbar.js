@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native';
 
 const LOGO = require('../../assets/logo.jpg');
 
-export default function Navbar({ activePage, onNavigate, healthStatus, currentUser, onLogout }) {
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-
+export default function Navbar({ activePage, onNavigate, onBack }) {
   return (
     <View style={styles.navbar}>
       <View style={styles.navContainer}>
@@ -73,70 +71,17 @@ export default function Navbar({ activePage, onNavigate, healthStatus, currentUs
               🏢 Regional Markets
             </Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.navItem, activePage === 'profile' && styles.navItemActive]}
-            onPress={() => onNavigate('profile')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.navText, activePage === 'profile' && styles.navTextActive]}>
-              👤 My Account
-            </Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Right Status & User Profile Badge */}
+        {/* Right Action: Back Button */}
         <View style={styles.rightGroup}>
-          <View style={styles.statusBadge}>
-            <View style={[styles.statusDot, { backgroundColor: healthStatus ? '#10B981' : '#059669' }]} />
-            <Text style={styles.statusText}>
-              {healthStatus ? 'API Connected' : 'System Ready'}
-            </Text>
-          </View>
-
-          {currentUser ? (
-            <View style={{ position: 'relative' }}>
-              <TouchableOpacity
-                style={styles.profileBadgeBtn}
-                onPress={() => setShowProfileMenu(!showProfileMenu)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.profileBadgeText}>👤 {currentUser.full_name}</Text>
-              </TouchableOpacity>
-
-              {showProfileMenu ? (
-                <View style={styles.profileDropdown}>
-                  <Text style={styles.profileNameText}>{currentUser.full_name}</Text>
-                  <Text style={styles.profileSubText}>✉️ {currentUser.email}</Text>
-                  <Text style={styles.profileSubText}>📍 {currentUser.city}</Text>
-
-                  <View style={styles.dropdownDivider} />
-
-                  <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setShowProfileMenu(false);
-                      onNavigate('profile');
-                    }}
-                  >
-                    <Text style={styles.dropdownItemText}>👤 Account Details</Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.dropdownDivider} />
-
-                  <TouchableOpacity
-                    style={styles.logoutBtn}
-                    onPress={() => {
-                      setShowProfileMenu(false);
-                      onLogout();
-                    }}
-                  >
-                    <Text style={styles.logoutBtnText}>🚪 Log Out</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-            </View>
-          ) : null}
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={onBack}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.backBtnText}>← Back</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -221,90 +166,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusText: {
-    color: '#065F46',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  profileBadgeBtn: {
-    backgroundColor: '#0284C7',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 14,
-  },
-  profileBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  profileDropdown: {
-    position: 'absolute',
-    top: 42,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    minWidth: 220,
+  backBtn: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#CBD5E1',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 8,
-    zIndex: 999,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  profileNameText: {
-    fontSize: 14,
-    fontWeight: '800',
+  backBtnText: {
     color: '#0F172A',
-    marginBottom: 4,
-  },
-  profileSubText: {
-    fontSize: 11,
-    color: '#64748B',
-    marginBottom: 2,
-  },
-  dropdownDivider: {
-    height: 1,
-    backgroundColor: '#E2E8F0',
-    marginVertical: 10,
-  },
-  dropdownItem: {
-    paddingVertical: 6,
-  },
-  dropdownItemText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
-    color: '#059669',
-  },
-  logoutBtn: {
-    backgroundColor: '#FEF2F2',
-    paddingVertical: 8,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-  },
-  logoutBtnText: {
-    color: '#991B1B',
-    fontSize: 12,
-    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });
